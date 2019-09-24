@@ -10,7 +10,7 @@ use \v;
 
 
 /**
- * 对接客户端websocket的处理(onMessage)
+ * websocket message processing
  * Class Ws
  * @package app\ws
  */
@@ -134,7 +134,7 @@ class ws
     }
 
     /**
-     * 加入群组
+     * join group
      * @param object $msg
      */
     public static function join_group(object $msg) : void {
@@ -152,7 +152,7 @@ class ws
     }
 
     /**
-     * 离开群组
+     * leave group
      * @param object $msg
      */
     public static function leave_group(object $msg) : void {
@@ -166,7 +166,7 @@ class ws
     }
 
     /**
-     * 解散群组(剔除所有成员)
+     * abandon group
      * @param object $msg
      */
     public static function abandon_group(object $msg) : void {
@@ -182,7 +182,7 @@ class ws
     }
 
     /**
-     * 断开连接
+     * close
      * @param object $msg
      */
     public static function close(object $msg) : void {
@@ -193,7 +193,7 @@ class ws
 
 
     /**
-     * 发送到某个用户(client_id)
+     * send message to someone (client_id)
      * @param object $msg
      */
     public static function send_to_cid(object $msg) : void {
@@ -209,7 +209,7 @@ class ws
     }
 
     /**
-     * 发送到某个用户(user_id)
+     * send message to someone (user_id)
      * @param object $msg
      */
     public static function send_to_uid(object $msg) : void {
@@ -221,7 +221,7 @@ class ws
     }
 
     /**
-     * 发送消息到某个组
+     * send message to a group
      * @param object $msg
      */
     public static function send_to_gid(object $msg) : void {
@@ -233,6 +233,7 @@ class ws
     }
 
     /**
+     * send message to all users
      * @param object $msg
      * @throws \Exception
      */
