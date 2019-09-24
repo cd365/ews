@@ -26,13 +26,34 @@ use GatewayWorker\{
 use GatewayWorker\Lib\Gateway as GateWayWorker;
 use Workerman\Lib\Timer;
 
-// 消息导航标记(用于解析数据,定向处理数据的位置)
-define('Uri','Uri');
-define('Separator','#');
-define('NamespacePrefix','\\App\\Ws\\');
+// variable
+class v {
+    public static $uri = 'uri';
+    public static $msg = 'msg';
+    public static $ping = 'ping';
+    public static $pong = 'pong';
+    public static $client_id = 'client_id';
+    public static $event = 'event';
+    public static $note = 'note';
+    public static $time = 'time';
+    public static $nonce = 'nonce';
 
-// 标记消息来源
-define('FromCid','FromCid');
+    public static $cid = 'cid';
+    public static $uid = 'uid';
+    public static $gid = 'gid';
+
+    public static $separator = '#';
+    public static $namespace_prefix = '\\app\\ws\\';
+    public static $from_client_id = 'from_client_id';
+
+    public static $event_connect = 'connect';
+    public static $event_error = 'error';
+    public static $event_close = 'close';
+
+    public static $msg_illegal = 'illegal message';
+    public static $msg_wrong_format = 'wrong format';
+    public static $msg_is_not_json_format = 'is not json format data';
+}
 
 start();
 
@@ -116,34 +137,28 @@ function start() : void {
  * Class Events
  */
 class Events {
-
     public static function onWorkerStart(businessWorker $businessWorker) : void {
-        Process::OnWorkerStart($businessWorker);
+        p::OnWorkerStart($businessWorker);
     }
-
     public static function onConnect($client_id) : void {
-        Process::OnConnect($client_id);
+        p::OnConnect($client_id);
     }
-
     public static function onMessage($client_id, $message) : void {
-        Process::OnMessage($client_id,$message);
+        p::OnMessage($client_id,$message);
     }
-
     public static function onClose($client_id) : void {
-        Process::OnClose($client_id);
+        p::OnClose($client_id);
     }
-
     public static function onWorkerStop(businessWorker $businessWorker) : void {
-        Process::OnWorkerStop($businessWorker);
+        p::OnWorkerStop($businessWorker);
     }
-
 }
 
 /**
  * 自定义进程处理类
- * Class Process
+ * Class p
  */
-class Process {
+class p {
 
     // 加入群组 *****
     //将client_id加入某个组,以便通过Gateway::sendToGroup发送数据
@@ -173,53 +188,63 @@ class Process {
 
     /**
      * 客户端握手回调事件
-     * @param string $clientId
+     * @param string $client_id
      * @throws \Exception
      */
-    public static function OnConnect(string $clientId='') : void {
-        GateWayWorker::sendToCurrentClient(static::MsgPack(['Cid'=>$clientId],'Connect'));
+    public static function OnConnect(string $client_id='') : void {
+        $msg = new \stdClass();
+        $cid = v::$client_id;
+        $msg->$cid = $client_id;
+        GateWayWorker::sendToCurrentClient(static::MsgPack($msg,v::$event_connect));
         return;
     }
 
     /**
      * 客户端发送消息回调事件
-     * @param $clientId
+     * @param $client_id
      * @param $message
      */
-    public static function OnMessage(string $clientId='',string $message='') : void {
+    public static function OnMessage(string $client_id='',string $message='') : void {
         $message = static::MsgDecrypt($message);
-        $msg = json_decode($message,true);
-        if (!is_array($msg)){
-            GateWayWorker::sendToCurrentClient(static::MsgPack([Msg=>'illegal message'],'Error'));
+        $mk = v::$msg;
+        $msg = json_decode($message);
+        if (!is_object($msg)){
+            $msg = new \stdClass();
+            $msg->$mk = v::$msg_is_not_json_format;
+            GateWayWorker::sendToCurrentClient(static::MsgPack($msg,v::$event_error));
             return;
         }
-        if (!isset($msg[Uri])){
-            GateWayWorker::sendToCurrentClient(static::MsgPack([Msg=>'wrong format'],'Error'));
+        $uri = v::$uri;
+        if (!isset($msg->$uri)){
+            $msg->$mk = v::$msg_wrong_format;
+            GateWayWorker::sendToCurrentClient(static::MsgPack($msg,v::$event_error));
             return;
         }
-        $actions = explode(Separator,$msg[Uri]);// abc.def.ghi.jkl.mn || abc#def#ghi#jkl#mn ...
+        $actions = explode(v::$separator,$msg->$uri);// abc.def.ghi.jkl.mn || abc#def#ghi#jkl#mn ...
         $suffix = end($actions);
         array_pop($actions);
-        $prefix = NamespacePrefix.implode('\\',$actions);
+        $prefix = v::$namespace_prefix.implode('\\',$actions);
         if (!method_exists($prefix,$suffix)){
-            GateWayWorker::sendToCurrentClient(static::MsgPack([Msg=>'illegal message'],'Error'));
+            $msg->$mk = v::$msg_illegal;
+            GateWayWorker::sendToCurrentClient(static::MsgPack($msg,v::$event_error));
             return;
         }
-        $msg[FromCid] = $clientId;
+        $from_client_id = v::$from_client_id;
+        $msg->$from_client_id = $client_id;
         $prefix::$suffix($msg);//\app\abc\def\ghi\jkl::mn($msg)
         return;
     }
 
     /**
      * 客户端断开连接回调事件
-     * @param string $clientId
+     * @param string $client_id
      */
-    public static function OnClose(string $clientId='') : void {
-        if (0 === GateWayWorker::isOnline($clientId)){
+    public static function OnClose(string $client_id='') : void {
+        if (0 === GateWayWorker::isOnline($client_id)){
             return;
         }
         // 告知客户端他已下线,调用closeClient方法后,开发者无需调用离开群组方法,系统将自动处理
-        GateWayWorker::closeClient($clientId,static::MsgPack([Msg=>'you have been disconnected'],'Close'));
+        GateWayWorker::closeClient($client_id,static::MsgPack([v::$msg=>'you have been disconnected'],v::$event_close));
         return;
     }
 
@@ -238,19 +263,23 @@ class Process {
 
     /**
      * 消息打包
-     * @param array $msg
+     * @param object $msg
      * @param string $event
      * @return string
      */
-    public static function MsgPack(array $msg=[],string $event='') : string {
+    public static function MsgPack(object $msg,string $event='') : string {
         // Event 作为返回给客户端的标记(如:HTML5),非必要可不传
         if ('' !== $event){
-            $msg['Event'] = $event;
+            $e = v::$event;
+            $msg->$e = $event;
         }
-        // 所有打包消息均带上以下信息
-        $msg['Note'] = [
-            'Time' => static::MillisecondTimestamp(),
-            'Nonce' => static::Nonce(6),
+        $note = v::$note;
+        $time = v::$time;
+        $nonce = v::$nonce;
+        // (服务器自定义消息内容)所有打包消息均带上以下信息
+        $msg->$note = [
+            $time => static::MillisecondTimestamp(),
+            $nonce => static::Nonce(6),
         ];
         return static::MsgEncrypt(json_encode($msg,JSON_UNESCAPED_UNICODE));
     }
